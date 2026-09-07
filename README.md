@@ -128,64 +128,74 @@ src/
 ```
 
 
-## Flood Evacuation (Google Maps)
+## Flood Evacuation (free/open-source geographic stack)
 
 Sidebar -> **Flood Evacuation**. A focused, honest MVP of a personalized flood
-evacuation recommendation, built on the Google Maps Platform:
+evacuation recommendation, built entirely on free, key-less geographic
+services -- no Google Maps Platform, no API key, no billing account:
 
-1. **Location** -- "Use My Location" (browser Geolocation API) or "Use Demo
-   Location" (a labeled sample point in Aizawl). Denied/unavailable/timeout/
-   unsupported-browser cases are handled without breaking the rest of the app
-   -- see `src/hooks/useGeolocation.ts`.
-2. **Candidate destinations** -- nearby hospitals, schools, and public
-   facilities within ~3 km, via the Places API when configured, or a small
-   set of clearly labeled `(demo)` candidates otherwise -- see
-   `src/data/evacuationDemo.ts`.
-3. **Scoring** -- every candidate gets a transparent, deterministic 0-100
-   score: elevation (higher = better, max 30) + distance (closer = better,
-   max 25) + accessibility (from a real or estimated walking time, max 20) +
-   suitability (candidate type, max 15) + hazard (always a neutral 5/10 --
-   this MVP has no live hazard data source, and does not fabricate one). See
-   `src/lib/evacuationScoring.ts`; every number shown is explained under
-   "Why this location?" in the UI.
-4. **Map + route** -- the recommended destination and a walking route are
-   drawn on a live Google Map when configured; "View Route in Google Maps"
-   always works (it just opens Google Maps directions in a new tab).
-5. **Practice This Evacuation** -- reuses the existing Unity preparedness
-   simulator integration below unchanged (`useUnitySimulator`), framed
-   honestly as practicing the evacuation *decision*, not an exact simulation
-   of the user's real route or neighborhood.
+- **Map** -- [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/copyright)
+  tiles, loaded from a CDN (`src/lib/leafletLoader.ts`). Free, no key, always available.
+- **Candidate destinations** -- the [Overpass API](https://overpass-api.de/)
+  (a free public OpenStreetMap query service) for nearby hospitals, schools,
+  and public facilities within ~3 km (`src/lib/geoServices.ts`).
+- **Elevation** -- [Open-Elevation](https://open-elevation.com/)'s free public
+  API.
+- **Routing** -- the [OSRM](http://project-osrm.org/) public demo server, for
+  a real walking route, distance, and duration.
+- **Location** -- "Use My Location" (browser Geolocation API, no service
+  involved) or "Use Demo Location" (a labeled sample point in Aizawl).
+  Denied/unavailable/timeout/unsupported-browser cases are handled without
+  breaking the rest of the app -- see `src/hooks/useGeolocation.ts`.
+- **Scoring** -- unchanged: every candidate gets a transparent, deterministic
+  0-100 score (elevation + distance + accessibility + suitability + hazard)
+  -- see `src/lib/evacuationScoring.ts`. This part never depended on Google
+  and didn't need to change for this migration.
+- **Practice This Evacuation** -- reuses the existing Unity preparedness
+  simulator integration unchanged (`useUnitySimulator`).
+- **View Route** -- opens the same route in OpenStreetMap's own directions
+  UI (`openstreetmap.org/directions`, itself OSRM-backed) in a new tab.
 
 ### Setup
 
-```bash
-cp .env.example .env.local
-# then set VITE_GOOGLE_MAPS_API_KEY in .env.local
-```
+None. There is no API key to configure -- `npm install && npm run dev` is
+enough. `.env.example` is kept only as a placeholder in case a future
+integration needs one.
 
-Enable these APIs on the key's Google Cloud project: **Maps JavaScript API**,
-**Places API**, **Directions API**, **Elevation API**. `.env.local` is
-gitignored (see `*.local` in `.gitignore`) -- never commit a real key.
+### Why the migration happened
 
-### Demo mode
+The original build of this feature used the Google Maps Platform (Maps JS,
+Places, Elevation, Directions APIs), which requires a linked billing account
+even for free-tier usage. That's a real barrier for a hackathon prototype, so
+this was replaced end-to-end with equivalent free services. The deterministic
+scoring engine and the Unity integration were untouched -- only the data
+sourcing and map rendering changed.
 
-With no key configured, or if any live Google call fails for any reason
-(invalid key, billing not enabled, quota, offline), the screen falls back to
-local demo data **per data source, not all-or-nothing** -- e.g. a real GPS
-location with Places unavailable still shows demo candidates scored against
-your real position. Every card and badge in the UI says plainly whether it's
-showing live or demo data; nothing fabricated is ever presented as real. See
-`src/hooks/useFloodEvacuation.ts` for exactly how each source degrades.
+### Demo mode and rate limits
+
+Every one of Overpass, Open-Elevation, and OSRM is a **shared public
+instance** with no authentication -- free, but also not guaranteed to be fast
+or always up, and subject to fair-use rate limiting. Each call is
+independently timeout-guarded and falls back to local demo data **per data
+source, not all-or-nothing** -- e.g. a real GPS location with Overpass
+unavailable still shows demo candidates scored against your real position.
+Every card and badge in the UI says plainly whether it's showing live or demo
+data; nothing fabricated is ever presented as real. See
+`src/hooks/useFloodEvacuation.ts` for exactly how each source degrades, and
+`src/lib/geoServices.ts` for the actual requests.
 
 ### Limitations
 
 No real-time flood/hazard data source is wired up (hazard score is always
-neutral). Candidate destinations are Places API results or hand-picked demo
-points, not verified official shelters. Elevation and routing numbers are
-real API output when live, or fixed demo numbers when not -- never
-interpolated or guessed to look more precise than they are. This is a
-preparedness/practice tool, not emergency dispatch or a validated evacuation
-authority -- see the in-app disclaimer on the screen itself.
+neutral). Candidate destinations are Overpass/OpenStreetMap results or
+hand-picked demo points, not verified official shelters -- OSM data quality
+varies by area. Elevation and routing numbers are real API output when live,
+or fixed demo numbers when not -- never interpolated or guessed to look more
+precise than they are. The OSRM and Open-Elevation public instances used here
+are demo/community infrastructure, not something to depend on for real
+emergency use. This is a preparedness/practice tool, not emergency dispatch
+or a validated evacuation authority -- see the in-app disclaimer on the
+screen itself.
 
 ## Unity Preparedness Simulator
 

@@ -5,12 +5,14 @@
 // location) -> DisasterReady scores nearby candidate destinations on a
 // transparent, deterministic formula (see src/lib/evacuationScoring.ts) ->
 // shows a recommended evacuation point with its reasoning -> lets the user
-// open the route in Google Maps, or practice the decision in the existing
+// open the route in OpenStreetMap, or practice the decision in the existing
 // Unity preparedness simulator.
 //
-// Google Maps Platform (Maps JS, Places, Elevation, Directions) is used
-// live when VITE_GOOGLE_MAPS_API_KEY is configured; every part of this
-// screen also works from local demo data when it isn't — see
+// Built entirely on free, key-less geographic services — OpenStreetMap /
+// Leaflet, Overpass, Open-Elevation, OSRM — see src/lib/geoServices.ts and
+// src/lib/leafletLoader.ts. No Google Maps Platform, no API key, no billing
+// account. Every live call can fail (these are shared public instances)
+// and independently falls back to clearly-labeled local demo data — see
 // src/hooks/useFloodEvacuation.ts and src/data/evacuationDemo.ts. The UI
 // always labels which one is in use; it never presents demo data as live.
 // ============================================================================
@@ -35,17 +37,17 @@ import { useFloodEvacuation } from "../hooks/useFloodEvacuation";
 import { useUnitySimulator } from "../hooks/useUnitySimulator";
 import { useApp } from "../state/AppContext";
 import { DEMO_USER_LOCATION, candidateTypeLabel } from "../data/evacuationDemo";
-import { isGoogleMapsConfigured } from "../lib/googleMapsLoader";
 import type { ScoredCandidate } from "../types/evacuation";
 
-function googleMapsDirectionsUrl(candidate: ScoredCandidate, origin: { lat: number; lng: number }) {
+// OpenStreetMap's own directions UI (no key, runs on the free OSRM-backed
+// router behind openstreetmap.org) — opens a walking route in a new tab,
+// mirroring what "View Route in Google Maps" used to do.
+function osmDirectionsUrl(candidate: ScoredCandidate, origin: { lat: number; lng: number }) {
   const params = new URLSearchParams({
-    api: "1",
-    origin: `${origin.lat},${origin.lng}`,
-    destination: `${candidate.location.lat},${candidate.location.lng}`,
-    travelmode: "walking",
+    engine: "fossgis_osrm_foot",
+    route: `${origin.lat},${origin.lng};${candidate.location.lat},${candidate.location.lng}`,
   });
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
+  return `https://www.openstreetmap.org/directions?${params.toString()}`;
 }
 
 function ScoreReasonList({ candidate }: { candidate: ScoredCandidate }) {
@@ -66,8 +68,6 @@ export function FloodEvacuation() {
   const geolocation = useGeolocation();
   const evacuation = useFloodEvacuation();
   const simulator = useUnitySimulator();
-
-  const apiConfigured = isGoogleMapsConfigured();
 
   // Once GPS resolves, immediately kick off analysis.
   useEffect(() => {
@@ -97,7 +97,7 @@ export function FloodEvacuation() {
         eyebrow="Flood preparedness"
         title="Flood Evacuation"
         subtitle="Find a recommended evacuation point based on your location, elevation, distance, and accessibility."
-        actions={<Badge tone={apiConfigured ? "forest" : "amber"} icon={<Waves size={12} />}>{apiConfigured ? "Live Google Maps" : "Demo mode"}</Badge>}
+        actions={<Badge tone="forest" icon={<Waves size={12} />}>OpenStreetMap · free, no API key</Badge>}
       />
 
       <Card className="mt-5 flex items-start gap-3 p-4">
@@ -220,9 +220,9 @@ export function FloodEvacuation() {
                     size="sm"
                     variant="secondary"
                     icon={<Navigation size={14} />}
-                    onClick={() => window.open(googleMapsDirectionsUrl(recommended, evacuation.result!.user), "_blank", "noopener,noreferrer")}
+                    onClick={() => window.open(osmDirectionsUrl(recommended, evacuation.result!.user), "_blank", "noopener,noreferrer")}
                   >
-                    View Route in Google Maps
+                    View Route in OpenStreetMap
                   </Button>
                   <Button
                     size="sm"

@@ -5,11 +5,13 @@
 // terrain/mission/early-warning type models in src/types/index.ts. It has
 // its own small contract, same spirit as src/types/simulator.ts.
 //
-// Everything here mirrors what a real Google Maps Platform integration
-// would return; in demo mode (no VITE_GOOGLE_MAPS_API_KEY configured, or a
-// live call fails for any reason) the same shapes are filled with clearly
-// labeled local demo data instead. See src/data/evacuationDemo.ts and
-// src/hooks/useFloodEvacuation.ts.
+// Built entirely on free, key-less geographic services — OpenStreetMap tiles
+// (Leaflet), the Overpass API (candidate destinations), Open-Elevation
+// (elevation), and the OSRM public demo routing server (walking routes).
+// No Google Maps Platform, no API key, no billing account required. Every
+// one of those live calls can fail (rate limit, timeout, public-instance
+// downtime) and independently falls back to clearly-labeled local demo data
+// — see src/data/evacuationDemo.ts and src/hooks/useFloodEvacuation.ts.
 // ============================================================================
 
 export interface LatLng {
@@ -42,7 +44,7 @@ export type GeolocationErrorKind = "denied" | "unavailable" | "timeout" | "unsup
 export type CandidateType = "hospital" | "school" | "shelter" | "public_facility" | "other_elevated";
 
 /** Where a candidate destination's data came from. */
-export type CandidateSource = "places" | "demo";
+export type CandidateSource = "osm" | "demo";
 
 export interface EvacuationCandidate {
   id: string;
@@ -50,9 +52,9 @@ export interface EvacuationCandidate {
   type: CandidateType;
   location: LatLng;
   source: CandidateSource;
-  /** Google Places place_id, when the candidate came from a live Places search. */
-  placeId?: string;
-  /** Meters. Undefined until the Elevation API (or demo data) fills it in. */
+  /** OpenStreetMap element id ("node/12345"), when the candidate came from a live Overpass query. */
+  osmId?: string;
+  /** Meters. Undefined until Open-Elevation (or demo data) fills it in. */
   elevationM?: number;
   /** Straight-line meters from the user location. */
   straightLineDistanceM?: number;
@@ -64,10 +66,10 @@ export interface RouteInfo {
   durationSeconds: number;
   distanceText: string;
   durationText: string;
-  /** true when this came from a live Directions request; false when estimated from straight-line distance. */
+  /** true when this came from a live OSRM route; false when estimated from straight-line distance. */
   isLiveRoute: boolean;
-  /** Encoded polyline path, only present for a live route (used to draw it on the map). */
-  encodedPolyline?: string;
+  /** [lat, lng] path, only present for a live route (used to draw it on the Leaflet map). */
+  path?: LatLng[];
 }
 
 /** Transparent sub-scores that add up to ScoredCandidate.score. Every field documented in evacuationScoring.ts. */
@@ -87,7 +89,7 @@ export interface ScoredCandidate extends EvacuationCandidate {
   route: RouteInfo | null;
 }
 
-export type GoogleMapsLoadState = "idle" | "loading" | "ready" | "unavailable";
+export type MapLoadState = "idle" | "loading" | "ready" | "unavailable";
 
 /** Overall status of the evacuation analysis pipeline, surfaced in the UI. */
 export type EvacuationStatus = "idle" | "locating" | "analyzing" | "ready" | "error";
