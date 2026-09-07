@@ -128,6 +128,65 @@ src/
 ```
 
 
+## Flood Evacuation (Google Maps)
+
+Sidebar -> **Flood Evacuation**. A focused, honest MVP of a personalized flood
+evacuation recommendation, built on the Google Maps Platform:
+
+1. **Location** -- "Use My Location" (browser Geolocation API) or "Use Demo
+   Location" (a labeled sample point in Aizawl). Denied/unavailable/timeout/
+   unsupported-browser cases are handled without breaking the rest of the app
+   -- see `src/hooks/useGeolocation.ts`.
+2. **Candidate destinations** -- nearby hospitals, schools, and public
+   facilities within ~3 km, via the Places API when configured, or a small
+   set of clearly labeled `(demo)` candidates otherwise -- see
+   `src/data/evacuationDemo.ts`.
+3. **Scoring** -- every candidate gets a transparent, deterministic 0-100
+   score: elevation (higher = better, max 30) + distance (closer = better,
+   max 25) + accessibility (from a real or estimated walking time, max 20) +
+   suitability (candidate type, max 15) + hazard (always a neutral 5/10 --
+   this MVP has no live hazard data source, and does not fabricate one). See
+   `src/lib/evacuationScoring.ts`; every number shown is explained under
+   "Why this location?" in the UI.
+4. **Map + route** -- the recommended destination and a walking route are
+   drawn on a live Google Map when configured; "View Route in Google Maps"
+   always works (it just opens Google Maps directions in a new tab).
+5. **Practice This Evacuation** -- reuses the existing Unity preparedness
+   simulator integration below unchanged (`useUnitySimulator`), framed
+   honestly as practicing the evacuation *decision*, not an exact simulation
+   of the user's real route or neighborhood.
+
+### Setup
+
+```bash
+cp .env.example .env.local
+# then set VITE_GOOGLE_MAPS_API_KEY in .env.local
+```
+
+Enable these APIs on the key's Google Cloud project: **Maps JavaScript API**,
+**Places API**, **Directions API**, **Elevation API**. `.env.local` is
+gitignored (see `*.local` in `.gitignore`) -- never commit a real key.
+
+### Demo mode
+
+With no key configured, or if any live Google call fails for any reason
+(invalid key, billing not enabled, quota, offline), the screen falls back to
+local demo data **per data source, not all-or-nothing** -- e.g. a real GPS
+location with Places unavailable still shows demo candidates scored against
+your real position. Every card and badge in the UI says plainly whether it's
+showing live or demo data; nothing fabricated is ever presented as real. See
+`src/hooks/useFloodEvacuation.ts` for exactly how each source degrades.
+
+### Limitations
+
+No real-time flood/hazard data source is wired up (hazard score is always
+neutral). Candidate destinations are Places API results or hand-picked demo
+points, not verified official shelters. Elevation and routing numbers are
+real API output when live, or fixed demo numbers when not -- never
+interpolated or guessed to look more precise than they are. This is a
+preparedness/practice tool, not emergency dispatch or a validated evacuation
+authority -- see the in-app disclaimer on the screen itself.
+
 ## Unity Preparedness Simulator
 
 Missions → "Launch Preparedness Simulator" opens a separate Unity WebGL build in a

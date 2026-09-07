@@ -10,6 +10,7 @@ import { Overview } from "./screens/Overview";
 import { RegionPrep } from "./screens/RegionPrep";
 import { Explore } from "./screens/Explore";
 import { Missions } from "./screens/Missions";
+import { FloodEvacuation } from "./screens/FloodEvacuation";
 import { OfflineData } from "./screens/OfflineData";
 import { Safety } from "./screens/Safety";
 import { Monitoring } from "./screens/Monitoring";
@@ -20,6 +21,7 @@ export type ScreenId =
   | "prepare"
   | "explore"
   | "missions"
+  | "flood-evacuation"
   | "offline"
   | "safety"
   | "monitoring"
@@ -98,6 +100,7 @@ function Shell() {
               {screen === "prepare" && <RegionPrep onNavigate={navigate} />}
               {screen === "explore" && <Explore onNavigate={navigate} />}
               {screen === "missions" && <Missions onNavigate={navigate} />}
+              {screen === "flood-evacuation" && <FloodEvacuation />}
               {screen === "offline" && <OfflineData onNavigate={navigate} />}
               {screen === "safety" && <Safety />}
               {screen === "monitoring" && <Monitoring onNavigate={navigate} />}

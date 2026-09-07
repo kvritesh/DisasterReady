@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { Download, Home, Map, MountainSnow, Package, Radar, Settings, ShieldAlert, Target, Wifi, WifiOff } from "lucide-react";
+import { Download, Home, Map, MountainSnow, Package, Radar, Settings, ShieldAlert, Target, Waves, Wifi, WifiOff } from "lucide-react";
 import { Badge } from "../ui/primitives";
 import { useApp } from "../../state/AppContext";
 import type { ScreenId } from "../../App";
@@ -15,6 +15,7 @@ const NAV_ITEMS: { id: ScreenId; label: string; icon: typeof Home }[] = [
   { id: "offline", label: "Offline Data", icon: Package },
   { id: "explore", label: "Explore", icon: Map },
   { id: "missions", label: "Missions", icon: Target },
+  { id: "flood-evacuation", label: "Flood Evacuation", icon: Waves },
   { id: "monitoring", label: "Monitoring", icon: Radar },
   { id: "safety", label: "Early Warning", icon: ShieldAlert },
   { id: "settings", label: "Settings", icon: Settings },
