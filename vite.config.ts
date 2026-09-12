@@ -48,6 +48,24 @@ export default defineConfig({
         // the simulator online still get it fine — it's just not promised
         // offline the way the rest of the app is.
         globIgnores: ['unity-sim/**'],
+        // BUG FIX: vite-plugin-pwa's generateSW strategy registers a
+        // catch-all workbox NavigationRoute (`navigateFallback: 'index.html'`
+        // by default) that intercepts EVERY same-origin navigation request —
+        // including a brand-new top-level navigation to
+        // /unity-sim/index.html — and serves the cached React app shell
+        // instead. globIgnores above only keeps unity-sim/** out of the
+        // *precache manifest*; it does nothing to stop the navigation
+        // fallback, which is a separate mechanism. Net effect: once the
+        // service worker has installed (i.e. after the very first visit to
+        // the site, which is unavoidable), clicking "Practice This
+        // Evacuation" / "Launch Preparedness Simulator" opens a popup whose
+        // address bar shows the correct unity-sim URL, but whose actual
+        // content is the DisasterReady dashboard again — Unity never loads,
+        // no console error, no failed network request, because the service
+        // worker answered before the request ever reached the real file.
+        // Excluding /unity-sim/ from the navigate fallback lets that
+        // navigation fall through to the network/static file as normal.
+        navigateFallbackDenylist: [/^\/unity-sim\//],
         runtimeCaching: [
           // Google Fonts are cross-origin and not covered by the precache
           // manifest above — cache them at runtime so typography doesn't
