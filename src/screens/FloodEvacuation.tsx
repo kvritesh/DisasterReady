@@ -202,7 +202,19 @@ export function FloodEvacuation() {
             )}
           >
             {ultra && <TopographicPattern className="text-forest-100 opacity-[0.04]" />}
-            <div className="relative">
+            {/*
+              PRESENTATION-SAFETY FIX: this wrapper must carry h-full.
+              EvacuationMap.tsx's own outer element uses `h-full` (plus a
+              min-h-[280px] floor) to size itself against its parent — that
+              only resolves to a real pixel height because this Card is a
+              CSS Grid item that stretches to the row's height (grid's
+              default align-items: stretch). A plain wrapper div with no
+              height of its own breaks that percentage-height chain (a
+              `height: auto` parent makes a `height: 100%` child resolve to
+              auto too), collapsing the actual Leaflet map container to 0px
+              tall — invisible, regardless of Leaflet/tiles loading fine.
+            */}
+            <div className="relative h-full">
               <EvacuationMap user={evacuation.result.user} candidates={evacuation.result.candidates} recommended={recommended} />
             </div>
           </Card>

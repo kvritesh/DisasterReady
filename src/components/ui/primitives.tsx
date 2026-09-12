@@ -241,12 +241,15 @@ export function StatTile({
   detail,
   tone = "forest",
   icon,
+  className,
 }: {
   label: string;
   value: ReactNode;
   detail?: ReactNode;
   tone?: BadgeTone;
   icon?: ReactNode;
+  /** Optional override for the outer Card (e.g. an Ultra-mode dark treatment). Defaults unaffected. */
+  className?: string;
 }) {
   const toneText: Record<BadgeTone, string> = {
     forest: "text-forest-600",
@@ -256,7 +259,7 @@ export function StatTile({
     stone: "text-stone-600",
   };
   return (
-    <Card className="flex flex-col gap-2.5 p-5">
+    <Card className={clsx("flex flex-col gap-2.5 p-5", className)}>
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-bold uppercase tracking-wide text-stone-400">{label}</p>
         {icon && <span className={toneText[tone]}>{icon}</span>}
