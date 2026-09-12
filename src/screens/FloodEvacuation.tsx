@@ -139,7 +139,7 @@ export function FloodEvacuation() {
                 Where are you evacuating from?
               </p>
               <p className={clsx("mt-1 max-w-md text-[13px] leading-relaxed", ultra ? "text-stone-400" : "text-stone-500")}>
-                Use your current GPS location, or try the demo with a sample location in {region.name}.
+                Use your current GPS location, or try the demo with a sample location in Bengaluru.
               </p>
             </div>
           </div>

@@ -18,7 +18,7 @@
 
 import { useCallback, useState } from "react";
 import type { EvacuationStatus, RouteInfo, ScoredCandidate, UserLocation } from "../types/evacuation";
-import { DEMO_CANDIDATES, DEMO_USER_LOCATION } from "../data/evacuationDemo";
+import { DEMO_USER_LOCATION, buildFallbackCandidates } from "../data/evacuationDemo";
 import { haversineDistanceM, scoreAndRankCandidates } from "../lib/evacuationScoring";
 import { getElevationsOSM, getWalkingRouteOSRM, nearbySearchCandidatesOSM } from "../lib/geoServices";
 
@@ -56,7 +56,15 @@ export function useFloodEvacuation() {
     };
 
     let user: UserLocation = { ...base };
-    let candidates = DEMO_CANDIDATES.map((c) => ({ ...c }));
+    // PRESENTATION-SAFETY FIX: this used to start from a fixed Aizawl-only
+    // candidate list regardless of where `base` actually was — if the live
+    // Overpass search below then failed, the screen silently kept showing
+    // those Aizawl candidates for a user anywhere else on the map, producing
+    // absurd (e.g. ~2000km) "evacuation" distances. Fallback candidates are
+    // now always built relative to this analysis's actual origin, so a
+    // failed live search degrades to something local, never a fixed
+    // faraway point. See src/data/evacuationDemo.ts#buildFallbackCandidates.
+    let candidates = buildFallbackCandidates({ lat: base.lat, lng: base.lng }).map((c) => ({ ...c }));
 
     // User elevation (Open-Elevation)
     try {
