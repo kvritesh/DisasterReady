@@ -12,7 +12,53 @@ import { type HeightFieldParams, sampleHeight, sampleTerrain } from "./terrainMa
 
 export const WORLD_SIZE = 22;
 export const SEGMENTS = 84;
-export const HEIGHT_SCALE = 4.4;
+// Vertical exaggeration factor applied to the normalized (0..1) height field
+// when building the Three.js mesh and positioning markers/props. This is a
+// pure visual scale — it has zero effect on slopeDeg/elevationM/terrainClass
+// (see terrainMath.sampleTerrain, which derives those from the region's real
+// elevationMinM/elevationMaxM in meters, never from this constant). Standard
+// terrain-visualization technique: at true 1:1 proportions a ~2-4% real slope
+// ratio (this region's actual elevation range over its actual footprint)
+// reads as visually flat from an oblique 3D camera, even though the terrain
+// is genuinely steep in reality. Raised 4.4 -> 7 -> 9 (this pass) so the
+// rendered relief (ridgelines, valleys, slopes) is immediately readable as
+// "mountainous" from the default camera in Normal mode, without needing
+// Elevation mode's colors to do the work of showing shape.
+export const HEIGHT_SCALE = 9;
+
+// ----------------------------------------------------------------------------
+// Visual-only relief contrast
+// ----------------------------------------------------------------------------
+// sampleHeight() (terrainMath.ts) typically only reaches ~0.48-0.66 at a
+// region's highest ridge — great for keeping slopeDeg/elevationM/risk-tier
+// math well-behaved, but it means the raw shape spends most of its vertical
+// budget in a narrow band, which is exactly why the rendered terrain read as
+// "relatively flat with some bumps" instead of clearly-readable ridges and
+// valleys. visualContrast() stretches that same shape around a fixed pivot —
+// valleys pushed further down toward the flat basin floor, ridges pushed
+// further up toward the crest — with NO new noise/detail added, so slopes
+// stay smooth and believable rather than spiky or "fantasy mountain."
+//
+// This is used ONLY for the rendered mesh (buildTerrainGeometry) and for
+// anything placed on its surface via terrainHeightAt (trees, buildings,
+// rocks, trails, POI/mission/player markers). It is never used for
+// elevationM, slopeDeg, aspect, terrainClass, assessRegionRisk, or
+// fuseEarlyWarning — every one of those calls sampleHeight() directly and is
+// completely unaffected by anything in this section. The "DEMO TERRAIN
+// MODEL" data semantics (each region's real elevationMinM/elevationMaxM
+// range) are untouched; only the 3D sculpture built on top of them changed.
+const PEAK_HEIGHT_CEILING = 0.62; // typical achieved max of sampleHeight() across all 4 regions
+
+function visualContrast(h: number): number {
+  const pivot = 0.24;
+  const gain = 1.45;
+  return Math.max(0, pivot + (h - pivot) * gain);
+}
+
+/** Visual-only height (0..~0.8), for the rendered mesh and anything placed on it. */
+export function sampleVisualHeight(x: number, z: number, params: HeightFieldParams): number {
+  return visualContrast(sampleHeight(x, z, params));
+}
 
 export function heightFieldParams(region: Region): HeightFieldParams {
   return {
@@ -32,11 +78,16 @@ function normalColor(h: number, slopeDeg: number, out: THREE.Color) {
   const rock = new THREE.Color("#ab9a78");
   const cap = new THREE.Color("#eee7d6");
 
+  // Breakpoints tuned for the final terrain shaping function's typical
+  // per-region height range (max normalized height ~0.48-0.66 across the
+  // four regions, now much more consistent region-to-region than the
+  // interim version) so the rock/cap bands are reliably reachable right
+  // near each region's own ridgeline crest.
   let c: THREE.Color;
-  if (h < 0.14) c = deep.clone().lerp(mid, h / 0.14);
-  else if (h < 0.62) c = mid.clone().lerp(meadow, (h - 0.14) / 0.48);
-  else if (h < 0.85) c = meadow.clone().lerp(rock, (h - 0.62) / 0.23);
-  else c = rock.clone().lerp(cap, (h - 0.85) / 0.15);
+  if (h < 0.1) c = deep.clone().lerp(mid, h / 0.1);
+  else if (h < 0.32) c = mid.clone().lerp(meadow, (h - 0.1) / 0.22);
+  else if (h < 0.48) c = meadow.clone().lerp(rock, (h - 0.32) / 0.16);
+  else c = rock.clone().lerp(cap, (h - 0.48) / 0.52);
 
   // Steep faces read as bare rock/scree regardless of elevation band
   if (slopeDeg > 34) {
@@ -46,7 +97,15 @@ function normalColor(h: number, slopeDeg: number, out: THREE.Color) {
   out.copy(c);
 }
 
-function elevationColor(h: number, out: THREE.Color) {
+function elevationColor(hRaw: number, out: THREE.Color) {
+  // Normalize against the typical achieved peak (PEAK_HEIGHT_CEILING) rather
+  // than the theoretical 0..1 domain — sampleHeight() rarely exceeds ~0.62,
+  // so mapping raw h directly onto a 0..1 stop table meant the top two stops
+  // (amber/red) were almost never reached and "Elevation mode" quietly
+  // compressed LOW→MID→HIGH into the bottom 60% of its own color ramp. This
+  // is a color-ramp correctness fix, not a "make it more extreme" change —
+  // it makes the ramp actually reach the colors it was designed to reach.
+  const h = Math.min(1, Math.max(0, hRaw / PEAK_HEIGHT_CEILING));
   const stops: [number, string][] = [
     [0, "#284b6e"],
     [0.25, "#3f8f8a"],
@@ -112,8 +171,12 @@ export function buildTerrainGeometry(
   for (let i = 0; i < posAttr.count; i++) {
     const x = posAttr.getX(i);
     const z = posAttr.getZ(i);
+    // Raw h drives every *color* function below (already tuned against its
+    // real 0..~0.62 range) — only the rendered vertex position uses the
+    // visually-contrasted height. Same underlying shape, taller/steeper on
+    // screen only.
     const h = sampleHeight(x, z, params);
-    posAttr.setY(i, h * HEIGHT_SCALE);
+    posAttr.setY(i, visualContrast(h) * HEIGHT_SCALE);
 
     if (mode === "normal") {
       const sample = sampleTerrain(x, z, region, params);
@@ -141,7 +204,7 @@ export function buildTerrainGeometry(
 
 export function terrainHeightAt(x: number, z: number, region: Region): number {
   const params = heightFieldParams(region);
-  return sampleHeight(x, z, params) * HEIGHT_SCALE;
+  return sampleVisualHeight(x, z, params) * HEIGHT_SCALE;
 }
 
 export function findExtremum(

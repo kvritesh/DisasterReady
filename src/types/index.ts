@@ -202,6 +202,15 @@ export type VisualizationMode = "normal" | "elevation" | "slope" | "aspect";
 
 export type GraphicsQuality = "high" | "balanced" | "performance";
 
+/**
+ * UI EXPERIENCE MODE — purely presentational. "simple" is the existing
+ * lightweight interface; "ultra" is the richer, more immersive visual
+ * treatment (dark forest chrome, topographic textures, premium terrain
+ * overlays). Neither mode changes scoring, elevation data, evacuation
+ * logic, or any other underlying calculation — see AppContext/uiMode.
+ */
+export type UiMode = "simple" | "ultra";
+
 export interface AppState {
   selectedRegionId: RegionId;
   connectivity: ConnectivityState;
@@ -212,4 +221,5 @@ export interface AppState {
   notificationsEnabled: boolean;
   debugTerrain: boolean;
   showPerformance: boolean;
+  uiMode: UiMode;
 }

@@ -4,16 +4,19 @@ import {
   Compass as CompassIcon,
   Gauge,
   Layers,
+  Map as MapIcon,
   MapPin,
   Mountain,
   Navigation,
   Stethoscope,
+  Target,
   Tent,
+  Waves,
   Wifi,
   X,
 } from "lucide-react";
 import clsx from "clsx";
-import { Badge } from "../components/ui/primitives";
+import { ActionCard, Badge } from "../components/ui/primitives";
 import { useApp } from "../state/AppContext";
 import { poisForRegion } from "../data/pois";
 import { TerrainScene } from "../three/TerrainScene";
@@ -22,11 +25,14 @@ import { sampleTerrain } from "../three/terrainMath";
 import type { POI, TerrainPoint, VisualizationMode } from "../types";
 import type { ScreenId } from "../App";
 
-const MODES: { id: VisualizationMode; label: string }[] = [
-  { id: "normal", label: "Normal" },
-  { id: "elevation", label: "Elevation" },
-  { id: "slope", label: "Steepness" },
-  { id: "aspect", label: "Aspect" },
+// Icons are purely decorative labels for the same four real visualization
+// modes — the underlying VisualizationMode value and TerrainScene behavior
+// are identical regardless of which icon set is shown.
+const MODES: { id: VisualizationMode; label: string; icon: typeof Layers }[] = [
+  { id: "normal", label: "Normal", icon: Layers },
+  { id: "elevation", label: "Elevation", icon: Mountain },
+  { id: "slope", label: "Steepness", icon: Gauge },
+  { id: "aspect", label: "Aspect", icon: Navigation },
 ];
 
 const STEEPNESS_LEGEND: { color: string; label: string }[] = [
@@ -49,7 +55,10 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
     connectivity,
     debugTerrain,
     showPerformance,
+    uiMode,
   } = useApp();
+
+  const ultra = uiMode === "ultra";
 
   const [mode, setMode] = useState<VisualizationMode>("normal");
   const [selectedPoint, setSelectedPoint] = useState<{ x: number; z: number } | null>(null);
@@ -144,9 +153,18 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
     }
   };
 
+  const stat = terrainInfo ?? defaultStat;
+
   return (
     <div className="relative h-full w-full overflow-hidden bg-cream-100">
-      <Canvas shadows camera={{ position: [12.5, 9.5, 14], fov: 42 }} className="!absolute !inset-0">
+      {/* Camera position chosen so the default view looks across the
+          terrain's ridgelines (which run roughly north-south, i.e. along Z)
+          rather than down their length — a "down the length" view
+          foreshortens ridges into a blur; a broadside view shows their
+          rise-and-fall silhouette immediately, without needing to orbit.
+          This <Canvas>/<TerrainScene> is identical in Simple and Ultra —
+          only the DOM overlay chrome around it differs below. */}
+      <Canvas shadows camera={{ position: [20, 16, 14], fov: 42 }} className="!absolute !inset-0">
         <TerrainScene
           region={region}
           mode={mode}
@@ -160,59 +178,111 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
           showPerformance={showPerformance}
           controlsRef={controlsRef}
           compassRef={compassRef}
+          contourLines={ultra}
         />
       </Canvas>
 
       {/* Top-left region + live stats HUD */}
-      <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-2 sm:left-6 sm:top-6">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-stone-900/85 px-3.5 py-2 text-cream-50 backdrop-blur">
-          <MapPin size={14} className="text-forest-300" />
-          <span className="text-xs font-extrabold uppercase tracking-wide">{region.name}</span>
-          {region.status === "pilot" && (
-            <span className="ml-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[9.5px] font-bold uppercase text-amber-300">
-              Pilot
-            </span>
-          )}
-          {connectivity === "offline" && (
-            <span className="ml-1 flex items-center gap-1 rounded-full bg-danger-600 px-2 py-0.5 text-[9.5px] font-bold uppercase">
-              Offline
-            </span>
-          )}
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate("prepare")}
-              className="ml-1 text-[10.5px] font-semibold text-forest-300 hover:text-forest-200"
-            >
-              Change
-            </button>
-          )}
-        </div>
-        <div className="pointer-events-auto grid grid-cols-3 gap-1.5">
-          <HudStat icon={<Mountain size={12} />} label="Elevation" value={`${Math.round((terrainInfo ?? defaultStat).elevationM).toLocaleString()} m`} />
-          <HudStat icon={<Gauge size={12} />} label="Slope" value={`${(terrainInfo ?? defaultStat).slopeDeg.toFixed(0)}°`} />
-          <HudStat icon={<Navigation size={12} />} label="Aspect" value={(terrainInfo ?? defaultStat).aspect} />
-        </div>
-      </div>
-
-      {/* Visualization mode toggle */}
-      <div className="pointer-events-auto absolute right-4 top-4 flex flex-col items-end gap-1.5 sm:right-6 sm:top-6">
-        <div className="flex overflow-hidden rounded-xl border border-stone-200/60 bg-stone-900/85 p-1 backdrop-blur">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className={clsx(
-                "flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors",
-                mode === m.id ? "bg-forest-500 text-cream-50" : "text-stone-300 hover:text-cream-50"
+      {ultra ? (
+        <div className="pointer-events-none absolute left-4 top-4 sm:left-6 sm:top-6">
+          <div className="pointer-events-auto w-[264px] rounded-2xl border border-forest-400/15 bg-forest-950/90 p-4 text-cream-50 shadow-[var(--shadow-lift)] backdrop-blur">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <MapPin size={13} className="text-forest-300" />
+              <span className="text-[13px] font-extrabold uppercase tracking-wide">{region.name}</span>
+              {region.status === "pilot" && (
+                <Badge tone="amber" className="!px-1.5 !py-0.5 !text-[8px]">
+                  Pilot
+                </Badge>
               )}
-            >
-              <Layers size={11} />
-              {m.label}
-            </button>
-          ))}
+              {connectivity === "offline" && (
+                <Badge tone="danger" className="!px-1.5 !py-0.5 !text-[8px]">
+                  Offline
+                </Badge>
+              )}
+            </div>
+            <p className="mb-3 line-clamp-2 text-[11.5px] leading-snug text-stone-400">{region.description}</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              <UltraStat icon={<Mountain size={12} />} label="Elevation" value={`${Math.round(stat.elevationM).toLocaleString()} m`} />
+              <UltraStat icon={<Gauge size={12} />} label="Slope" value={`${stat.slopeDeg.toFixed(0)}°`} />
+              <UltraStat icon={<Navigation size={12} />} label="Aspect" value={stat.aspect} />
+            </div>
+            {onNavigate && (
+              <button
+                onClick={() => onNavigate("prepare")}
+                className="mt-3 text-[10.5px] font-semibold text-forest-300 hover:text-forest-200"
+              >
+                Change region
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-2 sm:left-6 sm:top-6">
+          <div className="pointer-events-auto flex items-center gap-2 rounded-2xl bg-stone-900/85 px-3.5 py-2 text-cream-50 backdrop-blur">
+            <MapPin size={14} className="text-forest-300" />
+            <span className="text-xs font-extrabold uppercase tracking-wide">{region.name}</span>
+            {region.status === "pilot" && (
+              <span className="ml-1 rounded-full bg-amber-400/20 px-2 py-0.5 text-[9.5px] font-bold uppercase text-amber-300">
+                Pilot
+              </span>
+            )}
+            {connectivity === "offline" && (
+              <span className="ml-1 flex items-center gap-1 rounded-full bg-danger-600 px-2 py-0.5 text-[9.5px] font-bold uppercase">
+                Offline
+              </span>
+            )}
+            {onNavigate && (
+              <button
+                onClick={() => onNavigate("prepare")}
+                className="ml-1 text-[10.5px] font-semibold text-forest-300 hover:text-forest-200"
+              >
+                Change
+              </button>
+            )}
+          </div>
+          <div className="pointer-events-auto grid grid-cols-3 gap-1.5">
+            <HudStat icon={<Mountain size={12} />} label="Elevation" value={`${Math.round(stat.elevationM).toLocaleString()} m`} />
+            <HudStat icon={<Gauge size={12} />} label="Slope" value={`${stat.slopeDeg.toFixed(0)}°`} />
+            <HudStat icon={<Navigation size={12} />} label="Aspect" value={stat.aspect} />
+          </div>
+        </div>
+      )}
+
+      {/* Visualization mode toggle — same MODES/setMode as Simple; Ultra just
+          looks like an integrated GIS control (icons + refined chrome). */}
+      <div className="pointer-events-auto absolute right-4 top-4 flex flex-col items-end gap-1.5 sm:right-6 sm:top-6">
+        <div
+          className={clsx(
+            "flex overflow-hidden rounded-xl border p-1 backdrop-blur",
+            ultra ? "border-forest-400/15 bg-forest-950/90" : "border-stone-200/60 bg-stone-900/85"
+          )}
+        >
+          {MODES.map((m) => {
+            const Icon = m.icon;
+            const active = mode === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={clsx(
+                  "flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors",
+                  active
+                    ? ultra
+                      ? "bg-forest-500/90 text-cream-50 shadow-[0_0_0_1px_rgba(116,168,125,0.3)]"
+                      : "bg-forest-500 text-cream-50"
+                    : ultra
+                      ? "text-stone-400 hover:text-cream-100"
+                      : "text-stone-300 hover:text-cream-50"
+                )}
+              >
+                <Icon size={11} />
+                {m.label}
+              </button>
+            );
+          })}
         </div>
         {mode === "slope" ? (
-          <SteepnessLegend />
+          <SteepnessLegend ultra={ultra} />
         ) : (
           mode !== "normal" && <Badge tone="amber">Demo terrain model</Badge>
         )}
@@ -231,22 +301,70 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
         </div>
       </div>
 
-      {/* Controls hint + Explore → Preparedness connection */}
-      <div className="pointer-events-none absolute bottom-6 left-6 hidden flex-col gap-1.5 sm:flex">
-        <div className="rounded-xl bg-stone-900/70 px-3 py-2 text-[10.5px] font-medium text-stone-200 backdrop-blur">
-          Drag to orbit · Scroll to zoom · Click terrain to inspect
-        </div>
-        <div className="rounded-xl bg-stone-900/70 px-3 py-2 text-[10.5px] font-medium text-forest-300 backdrop-blur">
-          Explore terrain → spot safer ground → complete missions
-        </div>
-        {pois.length === 0 && (
-          <div className="max-w-[260px] rounded-xl border border-amber-400/30 bg-amber-950/80 px-3 py-2 text-[10.5px] font-medium leading-snug text-amber-200 backdrop-blur">
-            No emergency POI data (hospitals/shelters) configured for {region.name} yet — this is a pilot
-            site. Terrain here is the same procedural demo model used everywhere; only Aizawl has POI data in
-            this prototype.
+      {ultra ? (
+        <>
+          {/* Subtle contextual guidance — same message as Simple, quieter styling, never covers the terrain */}
+          <div className="pointer-events-none absolute bottom-[124px] left-6 hidden sm:block">
+            <div className="rounded-xl border border-forest-400/10 bg-forest-950/70 px-3 py-1.5 text-[10.5px] font-medium text-forest-300/80 backdrop-blur">
+              Drag to orbit · Scroll to zoom · Click terrain to inspect
+            </div>
           </div>
-        )}
-      </div>
+          {pois.length === 0 && (
+            <div className="pointer-events-none absolute bottom-[124px] right-6 hidden max-w-[260px] sm:block">
+              <div className="rounded-xl border border-amber-400/25 bg-amber-950/80 px-3 py-2 text-[10.5px] font-medium leading-snug text-amber-200 backdrop-blur">
+                No emergency POI data (hospitals/shelters) configured for {region.name} yet — this is a pilot site.
+                Terrain here is the same procedural demo model used everywhere; only Aizawl has POI data in this
+                prototype.
+              </div>
+            </div>
+          )}
+
+          {/* Real working navigation — same three destinations described in
+              the product brief, wired to the same onNavigate the rest of
+              the app uses (no decorative/no-op buttons). */}
+          {onNavigate && (
+            <div className="pointer-events-auto absolute bottom-6 left-6 right-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <ActionCard
+                variant="ultra"
+                icon={<MapIcon size={16} />}
+                title="Explore Terrain"
+                description="Inspect elevation, slope and aspect across this region."
+                onClick={() => onNavigate("explore")}
+              />
+              <ActionCard
+                variant="ultra"
+                icon={<Waves size={16} />}
+                title="Find Safer Ground"
+                description="Compare evacuation routes and shelter suitability."
+                onClick={() => onNavigate("flood-evacuation")}
+              />
+              <ActionCard
+                variant="ultra"
+                icon={<Target size={16} />}
+                title="Complete Missions"
+                description="Earn XP and raise your preparedness score."
+                onClick={() => onNavigate("missions")}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="pointer-events-none absolute bottom-6 left-6 hidden flex-col gap-1.5 sm:flex">
+          <div className="rounded-xl bg-stone-900/70 px-3 py-2 text-[10.5px] font-medium text-stone-200 backdrop-blur">
+            Drag to orbit · Scroll to zoom · Click terrain to inspect
+          </div>
+          <div className="rounded-xl bg-stone-900/70 px-3 py-2 text-[10.5px] font-medium text-forest-300 backdrop-blur">
+            Explore terrain → spot safer ground → complete missions
+          </div>
+          {pois.length === 0 && (
+            <div className="max-w-[260px] rounded-xl border border-amber-400/30 bg-amber-950/80 px-3 py-2 text-[10.5px] font-medium leading-snug text-amber-200 backdrop-blur">
+              No emergency POI data (hospitals/shelters) configured for {region.name} yet — this is a pilot
+              site. Terrain here is the same procedural demo model used everywhere; only Aizawl has POI data in
+              this prototype.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Mission banner */}
       {activeMission && (
@@ -271,21 +389,41 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
 
       {/* Terrain info panel */}
       {terrainInfo && !selectedPoi && (
-        <div className="pointer-events-auto absolute bottom-6 left-1/2 w-[92%] max-w-sm -translate-x-1/2 sm:bottom-24 sm:left-auto sm:right-6 sm:translate-x-0">
-          <div className="rounded-2xl border border-stone-200 bg-white/95 p-4 shadow-[var(--shadow-lift)] backdrop-blur">
+        <div
+          className={clsx(
+            "pointer-events-auto absolute left-1/2 w-[92%] max-w-sm -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0",
+            ultra ? "bottom-[124px] sm:bottom-40" : "bottom-6 sm:bottom-24"
+          )}
+        >
+          <div
+            className={clsx(
+              "rounded-2xl border p-4 shadow-[var(--shadow-lift)] backdrop-blur",
+              ultra ? "border-forest-400/15 bg-forest-950/90 text-cream-50" : "border-stone-200 bg-white/95"
+            )}
+          >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-extrabold uppercase tracking-wide text-stone-500">Terrain information</p>
-              <button onClick={() => setTerrainInfo(null)} className="text-stone-300 hover:text-stone-500">
+              <p className={clsx("text-xs font-extrabold uppercase tracking-wide", ultra ? "text-forest-300/70" : "text-stone-500")}>
+                Terrain information
+              </p>
+              <button
+                onClick={() => setTerrainInfo(null)}
+                className={ultra ? "text-stone-500 hover:text-cream-100" : "text-stone-300 hover:text-stone-500"}
+              >
                 <X size={15} />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <InfoRow label="Elevation" value={`${Math.round(terrainInfo.elevationM).toLocaleString()} m`} />
-              <InfoRow label="Slope" value={`${terrainInfo.slopeDeg.toFixed(0)}°`} />
-              <InfoRow label="Aspect" value={terrainInfo.aspect} />
-              <InfoRow label="Terrain" value={terrainInfo.terrainClass} />
+              <InfoRow ultra={ultra} label="Elevation" value={`${Math.round(terrainInfo.elevationM).toLocaleString()} m`} />
+              <InfoRow ultra={ultra} label="Slope" value={`${terrainInfo.slopeDeg.toFixed(0)}°`} />
+              <InfoRow ultra={ultra} label="Aspect" value={terrainInfo.aspect} />
+              <InfoRow ultra={ultra} label="Terrain" value={terrainInfo.terrainClass} />
             </div>
-            <div className="mt-3 flex items-center gap-1.5 border-t border-stone-100 pt-3 text-xs font-bold text-forest-600">
+            <div
+              className={clsx(
+                "mt-3 flex items-center gap-1.5 border-t pt-3 text-xs font-bold",
+                ultra ? "border-forest-400/10 text-forest-300" : "border-stone-100 text-forest-600"
+              )}
+            >
               <Wifi size={12} /> Offline: Available
             </div>
           </div>
@@ -294,28 +432,51 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
 
       {/* POI info card */}
       {selectedPoi && (
-        <div className="pointer-events-auto absolute bottom-6 left-1/2 w-[92%] max-w-sm -translate-x-1/2 sm:bottom-24 sm:left-auto sm:right-6 sm:translate-x-0">
-          <div className="rounded-2xl border border-stone-200 bg-white/95 p-4 shadow-[var(--shadow-lift)] backdrop-blur">
+        <div
+          className={clsx(
+            "pointer-events-auto absolute left-1/2 w-[92%] max-w-sm -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0",
+            ultra ? "bottom-[124px] sm:bottom-40" : "bottom-6 sm:bottom-24"
+          )}
+        >
+          <div
+            className={clsx(
+              "rounded-2xl border p-4 shadow-[var(--shadow-lift)] backdrop-blur",
+              ultra ? "border-forest-400/15 bg-forest-950/90 text-cream-50" : "border-stone-200 bg-white/95"
+            )}
+          >
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-forest-100 text-forest-600">
+                <div
+                  className={clsx(
+                    "flex h-10 w-10 items-center justify-center rounded-xl",
+                    ultra ? "bg-forest-400/15 text-forest-300" : "bg-forest-100 text-forest-600"
+                  )}
+                >
                   {selectedPoi.type === "hospital" ? <Stethoscope size={18} /> : <Tent size={18} />}
                 </div>
                 <div>
-                  <p className="font-display text-sm font-extrabold text-stone-900">{selectedPoi.name}</p>
-                  <p className="text-xs text-stone-400">{selectedPoi.subtitle}</p>
+                  <p className="font-display text-sm font-extrabold">{selectedPoi.name}</p>
+                  <p className={clsx("text-xs", ultra ? "text-stone-400" : "text-stone-400")}>{selectedPoi.subtitle}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedPoi(null)} className="text-stone-300 hover:text-stone-500">
+              <button
+                onClick={() => setSelectedPoi(null)}
+                className={ultra ? "text-stone-500 hover:text-cream-100" : "text-stone-300 hover:text-stone-500"}
+              >
                 <X size={15} />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <InfoRow label="Distance" value={`${selectedPoi.distanceM} m`} />
-              {selectedPoi.capacity && <InfoRow label="Capacity" value={`${selectedPoi.capacity} people`} />}
+              <InfoRow ultra={ultra} label="Distance" value={`${selectedPoi.distanceM} m`} />
+              {selectedPoi.capacity && <InfoRow ultra={ultra} label="Capacity" value={`${selectedPoi.capacity} people`} />}
             </div>
-            <div className="mt-3 flex items-center justify-between border-t border-stone-100 pt-3">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-forest-600">
+            <div
+              className={clsx(
+                "mt-3 flex items-center justify-between border-t pt-3",
+                ultra ? "border-forest-400/10" : "border-stone-100"
+              )}
+            >
+              <div className={clsx("flex items-center gap-1.5 text-xs font-bold", ultra ? "text-forest-300" : "text-forest-600")}>
                 <Wifi size={12} /> Offline info available
               </div>
               <Badge tone="stone">Demo data</Badge>
@@ -327,10 +488,15 @@ export function Explore({ onNavigate }: { onNavigate?: (screen: ScreenId) => voi
   );
 }
 
-function SteepnessLegend() {
+function SteepnessLegend({ ultra }: { ultra?: boolean }) {
   return (
-    <div className="w-56 rounded-xl border border-stone-200/60 bg-stone-900/85 p-3 backdrop-blur">
-      <p className="mb-2 text-[9.5px] font-bold uppercase tracking-wide text-stone-400">
+    <div
+      className={clsx(
+        "w-56 rounded-xl border p-3 backdrop-blur",
+        ultra ? "border-forest-400/15 bg-forest-950/90" : "border-stone-200/60 bg-stone-900/85"
+      )}
+    >
+      <p className={clsx("mb-2 text-[9.5px] font-bold uppercase tracking-wide", ultra ? "text-forest-400/60" : "text-stone-400")}>
         Steepness indicator · demo heuristic
       </p>
       <div className="flex flex-col gap-1.5">
@@ -341,7 +507,7 @@ function SteepnessLegend() {
           </div>
         ))}
       </div>
-      <p className="mt-2 text-[10px] leading-snug text-stone-400">
+      <p className={clsx("mt-2 text-[10px] leading-snug", ultra ? "text-forest-400/50" : "text-stone-400")}>
         Illustrative terrain-risk indicator, not an authoritative safety map.
       </p>
     </div>
@@ -360,11 +526,25 @@ function HudStat({ icon, label, value }: { icon: React.ReactNode; label: string;
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+// Ultra's version of HudStat, laid out inside the floating context card
+// instead of as freestanding pills. Same values, denser presentation.
+function UltraStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-center rounded-lg bg-forest-900/60 px-2 py-1.5">
+      <span className="flex items-center gap-1 text-[8px] font-bold uppercase tracking-wide text-forest-400/70">
+        {icon}
+        {label}
+      </span>
+      <span className="text-[12px] font-extrabold tabular text-cream-50">{value}</span>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, ultra }: { label: string; value: string; ultra?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-stone-400">{label}</p>
-      <p className="font-display font-bold text-stone-800">{value}</p>
+      <p className={clsx("text-[10px] font-bold uppercase tracking-wide", ultra ? "text-forest-400/60" : "text-stone-400")}>{label}</p>
+      <p className={clsx("font-display font-bold", ultra ? "text-cream-50" : "text-stone-800")}>{value}</p>
     </div>
   );
 }

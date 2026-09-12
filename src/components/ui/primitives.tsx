@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import clsx from "clsx";
+import { ArrowUpRight } from "lucide-react";
 
 // ----------------------------------------------------------------------------
 // Card
@@ -263,5 +264,65 @@ export function StatTile({
       <p className={clsx("font-display text-xl font-extrabold", toneText[tone])}>{value}</p>
       {detail && <p className="text-xs text-stone-400">{detail}</p>}
     </Card>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Action card — large tappable card for "do the next real thing" navigation
+// (e.g. Explore's bottom action row). variant="ultra" is a richer visual
+// treatment for the same real onClick — it never changes what the card does.
+// ----------------------------------------------------------------------------
+export function ActionCard({
+  icon,
+  title,
+  description,
+  onClick,
+  variant = "simple",
+  className,
+}: {
+  icon?: ReactNode;
+  title: ReactNode;
+  description?: ReactNode;
+  onClick?: () => void;
+  variant?: "simple" | "ultra";
+  className?: string;
+}) {
+  const ultra = variant === "ultra";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        "group flex flex-col items-start gap-2.5 rounded-2xl border p-4 text-left transition-all duration-200",
+        ultra
+          ? "border-forest-100/10 bg-forest-950/85 text-cream-50 shadow-[var(--shadow-lift)] backdrop-blur hover:border-forest-400/40 hover:bg-forest-900/90"
+          : "border-stone-200 bg-white/95 text-stone-900 shadow-[var(--shadow-soft)] backdrop-blur hover:border-forest-300 hover:bg-forest-50/60",
+        className
+      )}
+    >
+      <div className="flex w-full items-center justify-between">
+        <div
+          className={clsx(
+            "flex h-9 w-9 items-center justify-center rounded-xl",
+            ultra ? "bg-forest-400/15 text-forest-300" : "bg-forest-100 text-forest-600"
+          )}
+        >
+          {icon}
+        </div>
+        <ArrowUpRight
+          size={16}
+          className={clsx(
+            "transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5",
+            ultra ? "text-stone-500 group-hover:text-forest-300" : "text-stone-300 group-hover:text-forest-500"
+          )}
+        />
+      </div>
+      <p className={clsx("font-display text-sm font-extrabold leading-tight", ultra ? "text-cream-50" : "text-stone-900")}>
+        {title}
+      </p>
+      {description && (
+        <p className={clsx("text-[12px] leading-snug", ultra ? "text-stone-400" : "text-stone-500")}>{description}</p>
+      )}
+    </button>
   );
 }

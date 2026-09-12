@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useReducer, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from "react";
 import type { ReactNode } from "react";
 import type {
   ConnectivityState,
@@ -8,6 +8,7 @@ import type {
   RegionId,
   SimulatedAlert,
   TerrainPoint,
+  UiMode,
   UserProgress,
 } from "../types";
 import { DEFAULT_REGION_ID, LAYER_DEFINITIONS, getRegion } from "../data/regions";
@@ -38,6 +39,7 @@ interface State {
   notificationsEnabled: boolean;
   debugTerrain: boolean;
   showPerformance: boolean;
+  uiMode: UiMode;
   toasts: ToastMessage[];
   activeMissionId: string | null;
   missionTargetHint: string | null;
@@ -45,6 +47,26 @@ interface State {
   lastPoint: TerrainPoint | null;
   /** Simulated High-severity warnings, keyed by region. See types#SimulatedAlert. */
   alerts: Partial<Record<RegionId, SimulatedAlert>>;
+}
+
+// ----------------------------------------------------------------------------
+// UI experience mode (Simple / Ultra) — presentation-only, persisted locally
+// ----------------------------------------------------------------------------
+// This is the ONLY app preference persisted across reloads right now (nothing
+// else in this reducer's state is written to storage). Guarded with
+// try/catch since localStorage can throw in some browser contexts (private
+// browsing, storage disabled) — in that case we just fall back to "simple"
+// for the session rather than crashing the app over a cosmetic preference.
+const UI_MODE_STORAGE_KEY = "disasterready.uiMode";
+
+function getInitialUiMode(): UiMode {
+  try {
+    const stored = window.localStorage.getItem(UI_MODE_STORAGE_KEY);
+    if (stored === "simple" || stored === "ultra") return stored;
+  } catch {
+    // localStorage unavailable — fall through to the default below.
+  }
+  return "simple";
 }
 
 const initialOfflinePackage = (): OfflinePackage => ({
@@ -74,6 +96,7 @@ const initialState: State = {
   notificationsEnabled: true,
   debugTerrain: false,
   showPerformance: false,
+  uiMode: getInitialUiMode(),
   toasts: [],
   activeMissionId: null,
   missionTargetHint: null,
@@ -95,6 +118,7 @@ type Action =
   | { type: "TOGGLE_NOTIFICATIONS" }
   | { type: "TOGGLE_DEBUG_TERRAIN" }
   | { type: "TOGGLE_PERFORMANCE" }
+  | { type: "SET_UI_MODE"; mode: UiMode }
   | { type: "ADD_TOAST"; toast: ToastMessage }
   | { type: "DISMISS_TOAST"; id: number }
   | { type: "DISMISS_CELEBRATION" }
@@ -226,6 +250,9 @@ function reducer(state: State, action: Action): State {
     case "TOGGLE_PERFORMANCE":
       return { ...state, showPerformance: !state.showPerformance };
 
+    case "SET_UI_MODE":
+      return { ...state, uiMode: action.mode };
+
     case "ADD_TOAST":
       return { ...state, toasts: [...state.toasts, action.toast] };
 
@@ -248,8 +275,13 @@ function reducer(state: State, action: Action): State {
     }
 
     case "RESET_DEMO":
+      // Reset demo/mission/progress state, but "Simple vs Ultra" is a
+      // presentation preference, not demo state — keep whatever the user
+      // currently has selected rather than snapping back to the value that
+      // happened to be in localStorage when the app first loaded.
       return {
         ...initialState,
+        uiMode: state.uiMode,
         toasts: [],
       };
 
@@ -273,6 +305,7 @@ interface AppContextValue extends State {
   toggleNotifications: () => void;
   toggleDebugTerrain: () => void;
   togglePerformance: () => void;
+  setUiMode: (mode: UiMode) => void;
   pushToast: (toast: Omit<ToastMessage, "id">) => void;
   dismissToast: (id: number) => void;
   dismissCelebration: () => void;
@@ -314,6 +347,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setConnectivity(state.connectivity === "connected" ? "offline" : "connected");
   }, [setConnectivity, state.connectivity]);
 
+  // Persist the Simple/Ultra choice so it survives a reload — see
+  // getInitialUiMode() above for the read side of this.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(UI_MODE_STORAGE_KEY, state.uiMode);
+    } catch {
+      // Non-fatal: the preference just won't survive a reload this time.
+    }
+  }, [state.uiMode]);
+
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
@@ -331,6 +374,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toggleNotifications: () => dispatch({ type: "TOGGLE_NOTIFICATIONS" }),
       toggleDebugTerrain: () => dispatch({ type: "TOGGLE_DEBUG_TERRAIN" }),
       togglePerformance: () => dispatch({ type: "TOGGLE_PERFORMANCE" }),
+      setUiMode: (mode) => dispatch({ type: "SET_UI_MODE", mode }),
       pushToast,
       dismissToast: (id) => dispatch({ type: "DISMISS_TOAST", id }),
       dismissCelebration: () => dispatch({ type: "DISMISS_CELEBRATION" }),

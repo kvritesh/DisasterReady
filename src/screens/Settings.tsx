@@ -8,13 +8,14 @@ import {
   MapPin,
   Package,
   RefreshCcw,
+  Sparkles,
   Trash2,
   WifiOff,
 } from "lucide-react";
 import clsx from "clsx";
 import { Badge, Button, Card, ScreenHeader } from "../components/ui/primitives";
 import { useApp } from "../state/AppContext";
-import type { GraphicsQuality } from "../types";
+import type { GraphicsQuality, UiMode } from "../types";
 import type { ScreenId } from "../App";
 
 function SettingsRow({
@@ -30,16 +31,16 @@ function SettingsRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-stone-100 py-4 last:border-0">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-500">
           {icon}
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-bold text-stone-800">{title}</p>
-          <p className="text-xs text-stone-400">{desc}</p>
+          <p className="max-w-sm text-xs text-stone-400">{desc}</p>
         </div>
       </div>
-      {control}
+      <div className="shrink-0">{control}</div>
     </div>
   );
 }
@@ -69,6 +70,16 @@ const QUALITY_OPTIONS: { id: GraphicsQuality; label: string }[] = [
   { id: "high", label: "High" },
 ];
 
+const UI_MODE_OPTIONS: { id: UiMode; label: string }[] = [
+  { id: "simple", label: "Simple" },
+  { id: "ultra", label: "Ultra" },
+];
+
+const UI_MODE_DESCRIPTIONS: Record<UiMode, string> = {
+  simple: "Lightweight interface optimized for clarity and performance.",
+  ultra: "Enhanced visual interface with immersive terrain presentation and richer interface effects.",
+};
+
 export function Settings({ onNavigate }: { onNavigate: (screen: ScreenId) => void }) {
   const {
     region,
@@ -86,6 +97,8 @@ export function Settings({ onNavigate }: { onNavigate: (screen: ScreenId) => voi
     offlinePackage,
     pushToast,
     resetDemo,
+    uiMode,
+    setUiMode,
   } = useApp();
   const [resetConfirm, setResetConfirm] = useState(false);
 
@@ -134,6 +147,27 @@ export function Settings({ onNavigate }: { onNavigate: (screen: ScreenId) => voi
                   className={clsx(
                     "px-3 py-1.5 text-xs font-bold transition-colors",
                     graphicsQuality === opt.id ? "bg-forest-600 text-cream-50" : "bg-white text-stone-500 hover:bg-stone-50"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+        <SettingsRow
+          icon={<Sparkles size={16} />}
+          title="Interface experience"
+          desc={UI_MODE_DESCRIPTIONS[uiMode]}
+          control={
+            <div className="flex overflow-hidden rounded-lg border border-stone-200">
+              {UI_MODE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setUiMode(opt.id)}
+                  className={clsx(
+                    "px-3 py-1.5 text-xs font-bold transition-colors",
+                    uiMode === opt.id ? "bg-forest-600 text-cream-50" : "bg-white text-stone-500 hover:bg-stone-50"
                   )}
                 >
                   {opt.label}

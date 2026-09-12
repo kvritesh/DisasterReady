@@ -37,6 +37,7 @@ export function TerrainScene({
   showPerformance,
   controlsRef,
   compassRef,
+  contourLines = false,
 }: {
   region: Region;
   mode: VisualizationMode;
@@ -50,6 +51,8 @@ export function TerrainScene({
   showPerformance: boolean;
   controlsRef: RefObject<any>;
   compassRef: RefObject<HTMLDivElement | null>;
+  /** Ultra-only subtle contour-line overlay — see TerrainMesh. */
+  contourLines?: boolean;
 }) {
   return (
     <>
@@ -58,12 +61,17 @@ export function TerrainScene({
 
       <SkyDome />
 
-      <hemisphereLight args={["#d5eaf7", "#c9b896", 0.45]} />
-      <ambientLight intensity={0.3} />
+      {/* Lower sun angle + reduced ambient/hemisphere fill than before —
+          deliberately raking light so slopes produce real, geometry-driven
+          highlights/shadows instead of being washed out flat. No painted-on
+          shadows anywhere here; every shadow below comes from castShadow on
+          the actual mesh. */}
+      <hemisphereLight args={["#d5eaf7", "#c9b896", 0.32]} />
+      <ambientLight intensity={0.2} />
       <directionalLight
-        position={[10, 14, 6]}
-        intensity={1.3}
-        color="#fff4de"
+        position={[16, 8, 5]}
+        intensity={1.55}
+        color="#fff0d8"
         castShadow
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
@@ -73,10 +81,10 @@ export function TerrainScene({
         shadow-camera-bottom={-16}
         shadow-camera-far={40}
       />
-      <directionalLight position={[-8, 6, -8]} intensity={0.18} color="#8fb0c9" />
+      <directionalLight position={[-8, 6, -8]} intensity={0.22} color="#8fb0c9" />
 
       <TerrainBase region={region} />
-      <TerrainMesh region={region} mode={mode} onSelect={onSelectPoint} />
+      <TerrainMesh region={region} mode={mode} onSelect={onSelectPoint} contourLines={contourLines} />
 
       {debugTerrain && (
         <group>
@@ -108,10 +116,10 @@ export function TerrainScene({
         enableDamping
         dampingFactor={0.08}
         minDistance={5}
-        maxDistance={21}
+        maxDistance={30}
         maxPolarAngle={Math.PI / 2.05}
         minPolarAngle={0.35}
-        target={[0, 0.6, 0]}
+        target={[0, 1, 0]}
       />
       <CompassDriver controlsRef={controlsRef} compassRef={compassRef} />
       {showPerformance && <Stats className="!absolute !bottom-16 !left-4 !right-auto !top-auto sm:!bottom-4" />}

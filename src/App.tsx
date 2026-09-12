@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { AppProvider, useApp } from "./state/AppContext";
 import { Sidebar } from "./components/layout/Sidebar";
+import { TopBar } from "./components/layout/TopBar";
 import { Toasts } from "./components/ui/Toasts";
 import { Celebration } from "./components/ui/Celebration";
 import { WarningAlert } from "./components/ui/WarningAlert";
@@ -30,7 +31,7 @@ export type ScreenId =
 function Shell() {
   const [screen, setScreen] = useState<ScreenId>("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const { connectivity } = useApp();
+  const { connectivity, uiMode } = useApp();
 
   const navigate = (next: ScreenId) => {
     setScreen(next);
@@ -79,6 +80,8 @@ function Shell() {
             {mobileNavOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
+
+        {uiMode === "ultra" && <TopBar screen={screen} onNavigate={navigate} />}
 
         {connectivity === "offline" && (
           <div className="flex items-center justify-center gap-2 bg-danger-600 px-4 py-1.5 text-center text-[12px] font-bold uppercase tracking-wide text-cream-50">
